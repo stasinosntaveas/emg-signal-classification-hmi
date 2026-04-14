@@ -1,10 +1,9 @@
 # EMG Gesture Classification HMI System
-![Python](https://img.shields.io/badge/python-3.10+-blue)
-![Machine Learning](https://img.shields.io/badge/machine%20learning-SVM%20%7C%20KNN%20%7C%20RF-orange)
-![Signal Processing](https://img.shields.io/badge/signal%20processing-EMG-blue)
-![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-used-yellow)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Python](https://img.shields.io/badge/python-3.10+-3776AB)
+![Machine Learning](https://img.shields.io/badge/scikit--learn-SVM%20%7C%20KNN%20%7C%20RF-F7931E)
+![Signal Processing](https://img.shields.io/badge/signal%20processing-EMG-00A6FB)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B)
+![License](https://img.shields.io/badge/license-MIT-6E7681)
 
 ## Overview
 This project implements an EMG (Electromyography) gesture classification pipeline along with an interactive Human-Machine Interface built using Streamlit.
