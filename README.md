@@ -209,10 +209,3 @@ These are automatically loaded by the Streamlit app.
 ## License
 
 This project is licensed under the MIT License.
-
----
-
-## Author
-
-Developed as part of an EMG-based HMI system project.
-
