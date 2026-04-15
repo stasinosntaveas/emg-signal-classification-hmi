@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import numpy as np
 import scipy.io
 import joblib
@@ -16,12 +17,15 @@ st.title("EMG Gesture Classification HMI")
 # ========================
 # LOAD MODELS (CACHE)
 # ========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
+
 @st.cache_resource
 def load_models():
-    scaler = joblib.load("../results/scaler.pkl")
-    svm = joblib.load("../results/svm.pkl")
-    knn = joblib.load("../results/knn.pkl")
-    rf = joblib.load("../results/rf.pkl")
+    scaler = joblib.load(os.path.join(RESULTS_DIR, "scaler.pkl"))
+    svm = joblib.load(os.path.join(RESULTS_DIR, "svm.pkl"))
+    knn = joblib.load(os.path.join(RESULTS_DIR, "knn.pkl"))
+    rf = joblib.load(os.path.join(RESULTS_DIR, "rf.pkl"))
     return scaler, svm, knn, rf
 
 scaler, svm, knn, rf = load_models()
@@ -174,3 +178,4 @@ if uploaded_file is not None:
     # ========================
     st.subheader("Sample Predictions")
     st.write(preds[:30])
+

@@ -2,6 +2,7 @@ import scipy.io
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -14,11 +15,15 @@ from sklearn.metrics import (
     classification_report
 )
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "..", "data", "DB2", "DB2_s1", "DB2_s1", "S1_E1_A1.mat")
+RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
+
 # ========================
 # 1. LOAD DATA
 # ========================
 
-file_path = "../data/DB2/DB2_s1/DB2_s1/S1_E1_A1.mat"
+file_path = DATA_PATH
 data = scipy.io.loadmat(file_path)
 
 emg = data['emg']
@@ -226,11 +231,11 @@ svm.fit(X_train, y_train)
 knn.fit(X_train, y_train)
 rf.fit(X_train, y_train)
 
-joblib.dump(svm, "../results/svm.pkl")
-joblib.dump(knn, "../results/knn.pkl")
-joblib.dump(rf, "../results/rf.pkl")
+joblib.dump(svm, os.path.join(RESULTS_DIR, "svm.pkl"))
+joblib.dump(knn, os.path.join(RESULTS_DIR, "knn.pkl"))
+joblib.dump(rf, os.path.join(RESULTS_DIR, "rf.pkl"))
 
-joblib.dump(scaler, "../results/scaler.pkl")
+joblib.dump(scaler, os.path.join(RESULTS_DIR, "scaler.pkl"))
 
 print("\nAll models saved to /results")
 
