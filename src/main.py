@@ -4,70 +4,34 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    classification_report
-)
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+# ========================
+# PATHS
+# ========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "..", "data", "DB2", "DB2_s1", "DB2_s1", "S1_E1_A1.mat")
+DATA_DIR = os.path.join(BASE_DIR, "..", "data", "DB2")
 RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
 
 # ========================
-# 1. LOAD DATA
+# HELPER FUNCTIONS
 # ========================
 
-file_path = DATA_PATH
-data = scipy.io.loadmat(file_path)
-
-emg = data['emg']
-labels = data['restimulus'].flatten()
-
-print("EMG shape:", emg.shape)
-print("Labels shape:", labels.shape)
-print("Unique labels:", np.unique(labels))
-
-
-# ========================
-# 2. WINDOWING
-# ========================
-
-window_size = 200
-step_size = 100
-
-X = []
-y = []
-
-for i in range(0, len(emg) - window_size, step_size):
-    window = emg[i:i + window_size]
-    label_window = labels[i:i + window_size]
-
-    label = np.bincount(label_window).argmax()
-
-    if label != 0:
-        X.append(window)
-        y.append(label)
-
-X = np.array(X)
-y = np.array(y)
-
-print("X shape:", X.shape)
-print("y shape:", y.shape)
-
-
-# ========================
-# 3. FEATURE EXTRACTION
-# ========================
+def get_subject_path(subject, exercise=1):
+    return os.path.join(
+        DATA_DIR,
+        f"DB2_s{subject}",
+        f"DB2_s{subject}",
+        f"S{subject}_E{exercise}_A1.mat"
+    )
 
 def extract_features(window):
     features = []
-
     for ch in range(window.shape[1]):
         signal = window[:, ch]
 
@@ -79,44 +43,77 @@ def extract_features(window):
 
     return features
 
+def process_subject(file_path):
+    data = scipy.io.loadmat(file_path)
 
-X_features = np.array([extract_features(w) for w in X])
+    emg = data['emg']
+    labels = data['restimulus'].flatten()
 
-print("Feature shape:", X_features.shape)
+    window_size = 200
+    step_size = 100
 
+    X = []
+    y = []
+
+    for i in range(0, len(emg) - window_size, step_size):
+        window = emg[i:i + window_size]
+        label_window = labels[i:i + window_size]
+
+        label = np.bincount(label_window).argmax()
+
+        if label != 0:
+            X.append(window)
+            y.append(label)
+
+    X = np.array(X)
+    y = np.array(y)
+
+    X_features = np.array([extract_features(w) for w in X])
+
+    return X_features, y
 
 # ========================
-# 4. TRAIN / TEST SPLIT
+# SUBJECT SPLIT
 # ========================
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X_features,
-    y,
-    test_size=0.2,
-    random_state=42
-)
+train_subjects = list(range(1,6))
+test_subject = 40
 
+X_train_list, y_train_list = [], []
+
+print("Processing training subjects...")
+for s in train_subjects:
+    print(f"Subject {s}")
+    X_s, y_s = process_subject(get_subject_path(s))
+    X_train_list.append(X_s)
+    y_train_list.append(y_s)
+
+print(f"\nProcessing test subject {test_subject}...")
+X_test, y_test = process_subject(get_subject_path(test_subject))
+
+# Concatenate training data
+X_train = np.vstack(X_train_list)
+y_train = np.hstack(y_train_list)
+
+print("\nTrain shape:", X_train.shape)
+print("Test shape:", X_test.shape)
 
 # ========================
-# 5. SCALING
+# SCALING
 # ========================
 
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-
 # ========================
-# 6. MODELS
+# MODELS
 # ========================
 
 models = {
     "SVM": SVC(),
     "KNN": KNeighborsClassifier(n_neighbors=5),
-    "Random Forest": RandomForestClassifier(
-        n_estimators=100,
-        random_state=42
-    )
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
 }
 
 results = {}
@@ -143,31 +140,22 @@ for name, model in models.items():
         best_model_name = name
         best_pred = y_pred
 
-
 # ========================
-# 7. VISUALISATIONS
+# VISUALIZATIONS
 # ========================
 
 class_labels = list(range(1, 18))
 
-
-# ------------------------
-# 7.1 Accuracy comparison
-# ------------------------
-
+# Accuracy comparison
 plt.figure(figsize=(6, 4))
 plt.bar(list(results.keys()), list(results.values()))
-plt.title("Model Accuracy Comparison (EMG Classification)")
+plt.title("Model Accuracy Comparison (Cross-Subject EMG)")
 plt.ylabel("Accuracy")
 plt.ylim(0, 1)
 plt.grid(axis='y', alpha=0.3)
 plt.show()
 
-
-# ------------------------
-# 7.2 Confusion matrix
-# ------------------------
-
+# Confusion matrix
 cm = confusion_matrix(y_test, best_pred, normalize='true')
 
 plt.figure(figsize=(10, 8))
@@ -185,16 +173,15 @@ plt.xlabel("Predicted Class")
 plt.ylabel("True Class")
 plt.show()
 
-
-# ------------------------
-# 7.3 Per-class F1-score
-# ------------------------
-
+# Per-class F1-score
 report = classification_report(y_test, best_pred, output_dict=True)
 
 f1_scores = []
 for c in class_labels:
-    f1_scores.append(report[str(c)]["f1-score"])
+    if str(c) in report:
+        f1_scores.append(report[str(c)]["f1-score"])
+    else:
+        f1_scores.append(0)
 
 plt.figure(figsize=(10, 4))
 plt.bar(class_labels, f1_scores)
@@ -206,22 +193,21 @@ plt.xticks(class_labels)
 plt.grid(axis='y', alpha=0.3)
 plt.show()
 
-
 # ========================
-# 8. SUMMARY
+# SUMMARY
 # ========================
 
 print("\n======================")
 print("BEST MODEL:", best_model_name)
 print(f"{best_model_name} ACCURACY:", best_acc)
 
-
-
 # ========================
-# 9. SAVE MODELS
+# SAVE MODELS
 # ========================
 
 import joblib
+
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 svm = SVC()
 knn = KNeighborsClassifier(n_neighbors=5)
@@ -234,7 +220,6 @@ rf.fit(X_train, y_train)
 joblib.dump(svm, os.path.join(RESULTS_DIR, "svm.pkl"))
 joblib.dump(knn, os.path.join(RESULTS_DIR, "knn.pkl"))
 joblib.dump(rf, os.path.join(RESULTS_DIR, "rf.pkl"))
-
 joblib.dump(scaler, os.path.join(RESULTS_DIR, "scaler.pkl"))
 
 print("\nAll models saved to /results")
