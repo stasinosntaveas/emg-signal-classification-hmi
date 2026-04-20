@@ -3,19 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from scipy.stats import skew
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.model_selection import RandomizedSearchCV
 
 # ========================
 # PATHS
 # ========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "..", "data", "DB2")
+DATA_DIR = os.path.join(BASE_DIR, "..", "data")
 RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
 
 # ========================
@@ -38,8 +40,20 @@ def extract_features(window):
         mav = np.mean(np.abs(signal))
         rms = np.sqrt(np.mean(signal ** 2))
         wl = np.sum(np.abs(np.diff(signal)))
+        zcr = np.sum(np.diff(np.sign(signal)) != 0)
+        ssc = np.sum(np.diff(np.sign(np.diff(signal))) != 0)
+        var = np.var(signal)
+        sk = skew(signal)
 
-        features.extend([mav, rms, wl])
+        # Frequency-domain features via FFT
+        fft_vals = np.abs(np.fft.rfft(signal))
+        freqs = np.fft.rfftfreq(len(signal))
+        fft_sum = np.sum(fft_vals) + 1e-10
+        mean_freq = np.sum(freqs * fft_vals) / fft_sum
+        cumsum = np.cumsum(fft_vals)
+        median_freq = freqs[np.searchsorted(cumsum, cumsum[-1] / 2)]
+
+        features.extend([mav, rms, wl, zcr, ssc, var, sk, mean_freq, median_freq])
 
     return features
 
@@ -61,7 +75,7 @@ def process_subject(file_path):
 
         label = np.bincount(label_window).argmax()
 
-        if label != 0:
+        if label in (6, 17):
             X.append(window)
             y.append(label)
 
@@ -110,28 +124,66 @@ X_test = scaler.transform(X_test)
 # MODELS
 # ========================
 
-models = {
-    "SVM": SVC(),
-    "KNN": KNeighborsClassifier(n_neighbors=5),
-    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
+param_grids = {
+    "SVM": {
+        "estimator": SVC(),
+        "params": {
+            "C": [0.01, 0.1, 1, 10, 100],
+            "kernel": ["rbf", "linear"],
+            "gamma": ["scale", "auto", 0.001, 0.01]
+        }
+    },
+    "KNN": {
+        "estimator": KNeighborsClassifier(),
+        "params": {
+            "n_neighbors": [1, 3, 5, 7, 11, 15],
+            "weights": ["uniform", "distance"],
+            "metric": ["euclidean", "manhattan", "minkowski"]
+        }
+    },
+    "Random Forest": {
+        "estimator": RandomForestClassifier(random_state=42),
+        "params": {
+            "n_estimators": [100, 200, 300],
+            "max_depth": [None, 5, 10, 20],
+            "min_samples_split": [2, 5, 10],
+            "max_features": ["sqrt", "log2"]
+        }
+    }
 }
 
 results = {}
 best_model_name = None
 best_pred = None
 best_acc = 0
+trained_models = {}
 
-for name, model in models.items():
+for name, cfg in param_grids.items():
     print("\n======================")
-    print(name)
+    print(f"Randomized search: {name}")
 
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    search = RandomizedSearchCV(
+        cfg["estimator"],
+        cfg["params"],
+        n_iter=30,
+        cv=5,
+        scoring="accuracy",
+        n_jobs=-1,
+        random_state=42,
+        verbose=1
+    )
+    search.fit(X_train, y_train)
 
+    best_model = search.best_estimator_
+    trained_models[name] = best_model
+
+    y_pred = best_model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     results[name] = acc
 
-    print("Accuracy:", acc)
+    print(f"Best params: {search.best_params_}")
+    print(f"CV accuracy: {search.best_score_:.4f}")
+    print(f"Test accuracy: {acc:.4f}")
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred))
 
@@ -144,7 +196,7 @@ for name, model in models.items():
 # VISUALIZATIONS
 # ========================
 
-class_labels = list(range(1, 18))
+class_labels = [6, 17]
 
 # Accuracy comparison
 plt.figure(figsize=(6, 4))
@@ -209,17 +261,9 @@ import joblib
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-svm = SVC()
-knn = KNeighborsClassifier(n_neighbors=5)
-rf = RandomForestClassifier(n_estimators=100, random_state=42)
-
-svm.fit(X_train, y_train)
-knn.fit(X_train, y_train)
-rf.fit(X_train, y_train)
-
-joblib.dump(svm, os.path.join(RESULTS_DIR, "svm.pkl"))
-joblib.dump(knn, os.path.join(RESULTS_DIR, "knn.pkl"))
-joblib.dump(rf, os.path.join(RESULTS_DIR, "rf.pkl"))
+joblib.dump(trained_models["SVM"], os.path.join(RESULTS_DIR, "svm.pkl"))
+joblib.dump(trained_models["KNN"], os.path.join(RESULTS_DIR, "knn.pkl"))
+joblib.dump(trained_models["Random Forest"], os.path.join(RESULTS_DIR, "rf.pkl"))
 joblib.dump(scaler, os.path.join(RESULTS_DIR, "scaler.pkl"))
 
 print("\nAll models saved to /results")

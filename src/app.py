@@ -5,6 +5,8 @@ import scipy.io
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
+from scipy.stats import skew
 from sklearn.metrics import confusion_matrix
 
 # ========================
@@ -92,15 +94,25 @@ model = models[model_name]
 # ========================
 def extract_features(window):
     features = []
-
     for ch in range(window.shape[1]):
         signal = window[:, ch]
 
         mav = np.mean(np.abs(signal))
         rms = np.sqrt(np.mean(signal ** 2))
         wl = np.sum(np.abs(np.diff(signal)))
+        zcr = np.sum(np.diff(np.sign(signal)) != 0)
+        ssc = np.sum(np.diff(np.sign(np.diff(signal))) != 0)
+        var = np.var(signal)
+        sk = skew(signal)
 
-        features.extend([mav, rms, wl])
+        fft_vals = np.abs(np.fft.rfft(signal))
+        freqs = np.fft.rfftfreq(len(signal))
+        fft_sum = np.sum(fft_vals) + 1e-10
+        mean_freq = np.sum(freqs * fft_vals) / fft_sum
+        cumsum = np.cumsum(fft_vals)
+        median_freq = freqs[np.searchsorted(cumsum, cumsum[-1] / 2)]
+
+        features.extend([mav, rms, wl, zcr, ssc, var, sk, mean_freq, median_freq])
 
     return features
 
@@ -131,7 +143,7 @@ if uploaded_file is not None:
 
         label = np.bincount(label_window).argmax()
 
-        if label != 0:
+        if label in (6, 17):
             X.append(extract_features(window))
             y.append(label)
 
@@ -156,7 +168,7 @@ if uploaded_file is not None:
     # ========================
     cm = confusion_matrix(y, preds, normalize="true")
 
-    class_labels = list(range(1, 18))
+    class_labels = [6, 17]
 
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.heatmap(
@@ -174,8 +186,68 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # ========================
-    # SAMPLE OUTPUT
+    # PER-SAMPLE PREDICTIONS TABLE
     # ========================
-    st.subheader("Sample Predictions")
-    st.write(preds[:30])
+    st.subheader("Per-Sample Predictions")
+
+    gesture_names = {6: "Gesture 6 (Flexion)", 17: "Gesture 17 (Extension)"}
+
+    df = pd.DataFrame({
+        "Sample #": np.arange(1, len(y) + 1),
+        "True Label": [gesture_names[int(v)] for v in y],
+        "Predicted Label": [gesture_names[int(v)] for v in preds],
+        "Correct": ["✓" if t == p else "✗" for t, p in zip(y, preds)]
+    })
+
+    n_correct = (df["Correct"] == "✓").sum()
+    n_wrong = (df["Correct"] == "✗").sum()
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Samples", len(df))
+    col2.metric("Correct", n_correct)
+    col3.metric("Wrong", n_wrong)
+
+    filter_option = st.radio(
+        "Show",
+        ["All", "Only Correct", "Only Wrong"],
+        horizontal=True
+    )
+
+    if filter_option == "Only Correct":
+        display_df = df[df["Correct"] == "✓"]
+    elif filter_option == "Only Wrong":
+        display_df = df[df["Correct"] == "✗"]
+    else:
+        display_df = df
+
+    def render_predictions_table(df_to_render):
+        rows_html = ""
+        for _, row in df_to_render.iterrows():
+            is_correct = row["Correct"] == "✓"
+            bg = "#c3e6cb" if is_correct else "#f5c6cb"
+            fg = "#155724" if is_correct else "#721c24"
+            icon_color = "#1a7a31" if is_correct else "#9b1c1c"
+            rows_html += (
+                f'<tr style="background-color:{bg};color:{fg};font-size:15px;">'
+                f'<td style="padding:10px 15px;text-align:center;font-weight:bold;">{row["Sample #"]}</td>'
+                f'<td style="padding:10px 15px;">{row["True Label"]}</td>'
+                f'<td style="padding:10px 15px;">{row["Predicted Label"]}</td>'
+                f'<td style="padding:10px 15px;text-align:center;font-size:22px;font-weight:bold;color:{icon_color};">{row["Correct"]}</td>'
+                f'</tr>'
+            )
+        table_html = (
+            '<div style="max-height:520px;overflow-y:auto;border-radius:8px;border:2px solid #adb5bd;">'
+            '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">'
+            '<thead><tr style="background-color:#343a40;color:#ffffff;font-size:16px;position:sticky;top:0;">'
+            '<th style="padding:13px 15px;text-align:center;">Sample #</th>'
+            '<th style="padding:13px 15px;text-align:left;">True Label</th>'
+            '<th style="padding:13px 15px;text-align:left;">Predicted Label</th>'
+            '<th style="padding:13px 15px;text-align:center;">Result</th>'
+            '</tr></thead>'
+            f'<tbody>{rows_html}</tbody>'
+            '</table></div>'
+        )
+        st.markdown(table_html, unsafe_allow_html=True)
+
+    render_predictions_table(display_df)
 
