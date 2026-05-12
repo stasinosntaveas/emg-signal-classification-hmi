@@ -13,6 +13,12 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from sklearn.model_selection import RandomizedSearchCV
 
 # ========================
+# CONFIG
+# ========================
+
+GESTURE_CLASSES = [6, 17]  # Ninapro DB2 gesture IDs to train on
+
+# ========================
 # PATHS
 # ========================
 
@@ -75,7 +81,7 @@ def process_subject(file_path):
 
         label = np.bincount(label_window).argmax()
 
-        if label in (6, 17):
+        if label in GESTURE_CLASSES:
             X.append(window)
             y.append(label)
 
@@ -196,7 +202,7 @@ for name, cfg in param_grids.items():
 # VISUALIZATIONS
 # ========================
 
-class_labels = [6, 17]
+class_labels = GESTURE_CLASSES
 
 # Accuracy comparison
 plt.figure(figsize=(6, 4))
