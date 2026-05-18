@@ -16,7 +16,8 @@ from sklearn.model_selection import RandomizedSearchCV
 # CONFIG
 # ========================
 
-GESTURE_CLASSES = [6, 17]  # Ninapro DB2 gesture IDs to train on
+
+GESTURE_CLASSES = [6, 5, 9,11]  # Ninapro DB2 gesture IDs to train on
 
 # ========================
 # PATHS
@@ -96,7 +97,7 @@ def process_subject(file_path):
 # SUBJECT SPLIT
 # ========================
 
-train_subjects = list(range(1,6))
+train_subjects = list(range(1,9))
 test_subject = 40
 
 X_train_list, y_train_list = [], []
