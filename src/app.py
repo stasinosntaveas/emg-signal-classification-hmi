@@ -156,8 +156,24 @@ CHANNEL_MUSCLE_MAP = {
 }
 
 GESTURE_NAME_MAP = {
-    6:  "Wrist Flexion",
-    17: "Wrist Extension",
+    # Ninapro DB2 — Exercise B (17 basic movements of the hand and wrist)
+    1:  "Thumb Up",
+    2:  "Extension of Index & Middle, Flexion of Others",
+    3:  "Flexion of Ring & Little, Extension of Others",
+    4:  "Thumb Opposing Base of Little Finger",
+    5:  "Abduction of All Fingers",
+    6:  "Fingers Flexed Together in Fist",
+    7:  "Pointing Index",
+    8:  "Adduction of Extended Fingers",
+    9:  "Wrist Supination (toward Thumb)",
+    10: "Wrist Pronation (toward Little Finger)",
+    11: "Wrist Supination — Alt Axis",
+    12: "Wrist Pronation — Alt Axis",
+    13: "Wrist Flexion",
+    14: "Wrist Extension",
+    15: "Wrist Radial Deviation",
+    16: "Wrist Ulnar Deviation",
+    17: "Wrist Extension with Closed Hand",
 }
 
 N_CH   = 12
@@ -421,7 +437,7 @@ if uploaded_file is not None:
             "Active Gestures",
             options=available_gestures,
             default=default_sel,
-            format_func=lambda g: f"Gesture {int(g)}",
+            format_func=gesture_label,
         )
         st.markdown("---")
         st.markdown(
